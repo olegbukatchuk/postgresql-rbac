@@ -1,0 +1,94 @@
+#scope: pgsql-patroni
+#name: $(hostname)
+
+restapi:
+  listen: 0.0.0.0:8008
+  #connect_address: 127.0.0.1:8008
+  auth: "admin:admin"
+
+#consul:
+#  host: consul_agent:8500
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576 # 1 megabyte in bytes
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      stats_temp_directory: /var/run/postgresql/
+      parameters:
+        archive_mode: "on"
+        wal_level: replica
+        archive_command: pgbackrest --stanza=pgsql-patroni archive-push %p
+        max_connections: 7000
+        max_wal_senders: 15
+        wal_keep_segments: 300
+        archive_timeout: 60s
+        max_replication_slots: 5
+        hot_standby: "on"
+        wal_log_hints: "on"
+        track_io_timing: "on"
+        pg_stat_statements.max: '10000'
+        pg_stat_statements.track: top
+        shared_preload_libraries: pg_stat_statements,pg_qualstats,hypopg,powa,pg_stat_kcache,pg_wait_sampling
+        track_activity_query_size: 4096
+  initdb:  # Note: It needs to be a list (some options need values, others are switches)
+  - encoding: UTF8
+  - data-checksums
+
+  pg_hba:  # Add following lines to pg_hba.conf after running 'initdb'
+  - host replication replicator 0.0.0.0/0 md5
+  - host all all 0.0.0.0/0 md5
+
+  users:
+    admin:
+      password: admin
+      options:
+        - createrole
+        - createdb
+    monitor:
+      password: monitor
+      options:
+        - connection limit 5
+    postgres:
+      password: postgres
+      options:
+        - superuser
+
+postgresql:
+  listen: 0.0.0.0:5432
+  #connect_address: 127.0.0.1:5432
+  data_dir: /home/postgres/data
+  pgpass: /tmp/pgpass0
+  parameters:
+    archive_command: pgbackrest --stanza=pgsql-patroni archive-push %p
+    archive_mode: 'on'
+    archive_timeout: 60s
+    hot_standby: 'on'
+    max_connections: 7000
+    max_replication_slots: 5
+    max_wal_senders: 15
+    pg_stat_statements.max: '10000'
+    pg_stat_statements.track: top
+    shared_preload_libraries: pg_stat_statements,pg_qualstats,hypopg,powa,pg_stat_kcache,pg_wait_sampling
+    track_activity_query_size: 4096
+    wal_keep_segments: 300
+    wal_level: replica
+    wal_log_hints: 'on'
+    track_io_timing: 'on'
+  authentication:
+    replication:
+      username: replicator
+      password: rep-pass
+    superuser:
+      username: superuser
+      password: superuser
+
+tags:
+    nofailover: false
+    noloadbalance: false
+    clonefrom: false
+    nosync: false

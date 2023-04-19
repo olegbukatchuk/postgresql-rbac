@@ -1,0 +1,6 @@
+# weekly full backup (friday 01:01)
+1 1 * * 5 root /root/backup_pgsql.sh full
+# every six hours differential
+0 */6 * * * root /root/backup_pgsql.sh diff
+# every half an hour incremental
+0,30 * * * * root /root/backup_pgsql.sh incr

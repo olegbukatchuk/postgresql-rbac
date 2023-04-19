@@ -1,0 +1,111 @@
+
+version: "2"
+
+networks:
+    demo:
+
+services:
+    consul_agent:
+      image: consul:latest
+      networks: [ demo ]
+      hostname: consul_agent
+      container_name: consul_agent
+      command: "agent -retry-join consul-server-bootstrap -client 0.0.0.0"
+
+    consul-server-1:
+      image: consul:latest
+      networks: [ demo ]
+      hostname: consul-server-1
+      container_name: consul-server-1
+      depends_on:
+        - consul_agent
+      command: "agent -server -retry-join consul-server-bootstrap -client 0.0.0.0"
+
+    consul-server-2:
+      image: consul:latest
+      networks: [ demo ]
+      hostname: consul-server-2
+      container_name: consul-server-2
+      depends_on:
+        - consul-server-1
+      command: "agent -server -retry-join consul-server-bootstrap -client 0.0.0.0"
+
+    consul-server-bootstrap:
+      image: consul:latest
+      networks: [ demo ]
+      hostname: consul-server-bootstrap
+      container_name: consul-server-bootstrap
+      depends_on:
+        - consul-server-2
+      ports:
+        - "8400:8400"
+        - "8500:8500"
+        - "8600:8600"
+        - "8600:8600/udp"
+      command: "agent -server -bootstrap-expect 3 -ui -client 0.0.0.0"
+
+    patroni1:
+      build: ./
+      image: pgsql-patroni
+      networks: [ demo ]
+      hostname: patroni1
+      container_name: patroni1
+      depends_on:
+        - consul-server-bootstrap
+      environment:
+        PATRONI_NAME: patroni1
+        PATRONI_POSTGRESQL_CONNECT_ADDRESS: patroni1:5432
+        PATRONI_RESTAPI_CONNECT_ADDRESS: patroni1:8008
+      #volumes:
+      #  - ./data/patroni1:/home/postgres/data
+
+    patroni2:
+      image: pgsql-patroni
+      networks: [ demo ]
+      hostname: patroni2
+      container_name: patroni2
+      depends_on:
+        - patroni1
+      environment:
+        PATRONI_NAME: patroni2
+        PATRONI_POSTGRESQL_CONNECT_ADDRESS: patroni2:5432
+        PATRONI_RESTAPI_CONNECT_ADDRESS: patroni2:8008
+      #volumes:
+      #  - ./data/patroni2:/home/postgres/data
+
+    patroni3:
+      image: pgsql-patroni
+      networks: [ demo ]
+      hostname: patroni3
+      container_name: patroni3
+      depends_on:
+        - patroni2
+      environment:
+        PATRONI_NAME: patroni3
+        PATRONI_POSTGRESQL_CONNECT_ADDRESS: patroni3:5432
+        PATRONI_RESTAPI_CONNECT_ADDRESS: patroni3:8008
+      #volumes:
+      #  - ./data/patroni3:/home/postgres/data
+
+    haproxy:
+      image: haproxy
+      networks: [ demo ]
+      hostname: haproxy
+      container_name: demo-haproxy
+      depends_on:
+        - patroni2
+      ports:
+          - "5000:5000"
+      volumes:
+        - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+    powa:
+      build:
+        context: ../powa/
+      networks: [ demo ]
+      container_name: powa
+      ports:
+        - "8888:8888"
+      volumes:
+        - ../powa/powa.conf:/etc/powa-web.conf
+      mem_limit: 1024m
