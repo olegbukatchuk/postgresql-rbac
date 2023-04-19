@@ -5,7 +5,7 @@ git clone git@github.com:olegbukatchuk/postgresql-rbac.git
 ```
 #### 2. Запустить тестовый кластер PostgreSQL (в Docker Compose)
 ```
-# Перейти в директорию ./docker-postgresql-rbac, выдать права на запуск скриптов и запустить Compose-файл.
+# Перейти в директорию, выдать права на запуск скриптов и запустить Compose-файл.
 cd postgresql-rbac/ \
     && chmod +x ./scripts/pg_rbac_* \
     && docker-compose -f ./pg_patroni/docker-compose.yml up -d
